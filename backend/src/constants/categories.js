@@ -1,0 +1,52 @@
+export const SKILL_TYPES = ["skilled", "unskilled"]
+
+export const WORKER_CATEGORIES = [
+    { value: "maid", label: "Maid / House Cleaning", skill: "unskilled", keywords: ["maid", "cleaning", "house", "domestic", "bai", "kaamwali", "housekeeping"] },
+    { value: "cook", label: "Cook", skill: "skilled", keywords: ["cook", "kitchen", "chef", "khana", "rasoi"] },
+    { value: "cook_catering", label: "Cook (Party / Catering)", skill: "skilled", keywords: ["catering", "party", "event", "cook", "bulk"] },
+    { value: "babysitter", label: "Babysitter / Nanny", skill: "unskilled", keywords: ["baby", "nanny", "child", "ayah", "care"] },
+    { value: "elderly_care", label: "Elderly Care / Caretaker", skill: "skilled", keywords: ["elderly", "caretaker", "patient", "nursing", "old age"] },
+    { value: "electrician", label: "Electrician", skill: "skilled", keywords: ["electric", "wiring", "electrician", "bijli", "light"] },
+    { value: "plumber", label: "Plumber", skill: "skilled", keywords: ["plumber", "pipe", "tap", "water leak", "nal"] },
+    { value: "carpenter", label: "Carpenter", skill: "skilled", keywords: ["carpenter", "wood", "furniture", "badhai"] },
+    { value: "painter", label: "Painter", skill: "skilled", keywords: ["painter", "paint", "wall", "putty", "rang"] },
+    { value: "mason", label: "Mason / Construction", skill: "skilled", keywords: ["mason", "construction", "brick", "cement", "raj mistri"] },
+    { value: "construction_worker", label: "Construction Worker", skill: "unskilled", keywords: ["construction", "labour", "site", "building", "helper", "mazdoor", "beldar"] },
+    { value: "farm_labour", label: "Farm Labour", skill: "unskilled", keywords: ["farm", "labour", "agriculture", "field", "khet", "kisan", "mazdoor", "harvest"] },
+    { value: "welder", label: "Welder", skill: "skilled", keywords: ["welder", "welding", "iron", "gate", "grill"] },
+    { value: "fabricator", label: "Fabricator / Grill & Gate", skill: "skilled", keywords: ["fabrication", "grill", "gate", "steel", "iron work"] },
+    { value: "tile_marble", label: "Tile / Marble Fitter", skill: "skilled", keywords: ["tile", "marble", "flooring", "granite"] },
+    { value: "pop_ceiling", label: "POP / False Ceiling", skill: "skilled", keywords: ["pop", "ceiling", "false ceiling", "gypsum"] },
+    { value: "ac_technician", label: "AC Technician", skill: "skilled", keywords: ["ac", "air conditioner", "cooling", "hvac"] },
+    { value: "appliance_repair", label: "Appliance Repair (Fridge / Washing Machine)", skill: "skilled", keywords: ["fridge", "refrigerator", "washing machine", "appliance", "machine technician"] },
+    { value: "ro_technician", label: "Water Purifier (RO) Technician", skill: "skilled", keywords: ["ro", "water purifier", "filter", "aquaguard"] },
+    { value: "water_tanker", label: "Water Tanker / Water Supply", skill: "unskilled", keywords: ["water", "tanker", "supply", "pani"] },
+    { value: "borewell", label: "Borewell Service", skill: "skilled", keywords: ["borewell", "boring", "submersible", "water pump"] },
+    { value: "solar_technician", label: "Solar Panel Technician", skill: "skilled", keywords: ["solar", "panel", "inverter", "renewable"] },
+    { value: "mobile_repair", label: "Mobile / Computer Repair", skill: "skilled", keywords: ["mobile", "phone", "computer", "laptop", "repair"] },
+    { value: "cctv", label: "CCTV Installation", skill: "skilled", keywords: ["cctv", "camera", "security camera", "surveillance"] },
+    { value: "mechanic", label: "Mechanic (Auto)", skill: "skilled", keywords: ["mechanic", "car", "bike", "vehicle", "garage"] },
+    { value: "driver", label: "Driver", skill: "skilled", keywords: ["driver", "car", "chauffeur", "gaadi"] },
+    { value: "delivery", label: "Delivery Partner", skill: "unskilled", keywords: ["delivery", "courier", "parcel", "rider"] },
+    { value: "packers_movers", label: "Packers & Movers / Labour", skill: "unskilled", keywords: ["packers", "movers", "shifting", "labour", "loading"] },
+    { value: "gardener", label: "Gardener", skill: "unskilled", keywords: ["gardener", "garden", "plants", "mali", "lawn"] },
+    { value: "pest_control", label: "Pest Control", skill: "skilled", keywords: ["pest", "cockroach", "termite", "mosquito", "control"] },
+    { value: "security_guard", label: "Security Guard", skill: "unskilled", keywords: ["security", "guard", "watchman", "chowkidar"] },
+    { value: "barber", label: "Barber / Hair Salon (Home)", skill: "skilled", keywords: ["barber", "hair", "salon", "haircut", "naai"] },
+    { value: "beautician", label: "Beautician", skill: "skilled", keywords: ["beautician", "beauty", "parlour", "makeup", "facial"] },
+    { value: "tailor", label: "Tailor", skill: "skilled", keywords: ["tailor", "stitching", "darzi", "clothes", "silai"] },
+    { value: "laundry", label: "Laundry / Dhobi", skill: "unskilled", keywords: ["laundry", "dhobi", "ironing", "wash", "istri"] },
+    { value: "cleaner_commercial", label: "Office / Commercial Cleaner", skill: "unskilled", keywords: ["cleaner", "office", "commercial", "housekeeping", "sweeper"] },
+    { value: "photographer", label: "Photographer", skill: "skilled", keywords: ["photographer", "photo", "videographer", "camera", "shoot"] },
+    { value: "event_helper", label: "Event Helper / Waiter", skill: "unskilled", keywords: ["waiter", "event", "helper", "catering staff", "server"] },
+    { value: "tutor", label: "Tutor / Home Teacher", skill: "skilled", keywords: ["tutor", "teacher", "tuition", "coaching", "study"] },
+    { value: "priest", label: "Priest / Pandit", skill: "skilled", keywords: ["priest", "pandit", "pooja", "puja", "religious"] },
+    { value: "other", label: "Other", skill: "unskilled", keywords: ["other", "misc", "general"] },
+]
+
+export const CATEGORY_VALUES = WORKER_CATEGORIES.map((c) => c.value)
+
+export const CATEGORIES_BY_SKILL = {
+    skilled: WORKER_CATEGORIES.filter((c) => c.skill === "skilled").map((c) => c.value),
+    unskilled: WORKER_CATEGORIES.filter((c) => c.skill === "unskilled").map((c) => c.value),
+}
