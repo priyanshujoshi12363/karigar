@@ -17,6 +17,18 @@ const formatUser = (user) => ({
     createdAt: user.createdAt,
 })
 
+export const verifyToken = async (req, res) => {
+    try {
+        const user = await User.findById(req.userId)
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User not found" })
+        }
+        return res.status(200).json({ success: true, message: "Token valid", user: formatUser(user) })
+    } catch (err) {
+        return res.status(500).json({ success: false, message: err.message })
+    }
+}
+
 export const register = async (req, res) => {
     try {
         const { phone, name, address, coordinates, expoToken } = req.body
