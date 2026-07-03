@@ -84,6 +84,10 @@ const userSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        fcmToken: {
+            type: String,
+            default: null,
+        },
     },
     { timestamps: true, toJSON: { getters: true }, toObject: { getters: true } }
 )

@@ -52,8 +52,7 @@ fun SplashScreen(onNavigate: (String) -> Unit) {
 
         val dest = if (!token.isNullOrBlank()) {
             try {
-                val resp = ApiClient.api.verify("Bearer $token")
-                if (resp.success) Routes.MAIN else Routes.AUTH
+                if (ApiClient.api.verify("Bearer $token").success) Routes.MAIN else Routes.AUTH
             } catch (e: HttpException) {
                 if (e.code() == 401 || e.code() == 403 || e.code() == 404) {
                     store.clear()

@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,60 +17,119 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.karigar.app.data.Categories
+import com.karigar.app.data.TokenStore
+import com.karigar.app.data.remote.ApiClient
+import com.karigar.app.data.remote.OrderDto
 import com.karigar.app.ui.categoryIcon
 import com.karigar.app.ui.theme.brandHeaderBrush
 
-private data class ActiveOrder(
-    val category: String,
-    val worker: String,
-    val status: String,
-    val eta: String,
-    val startOtp: String,
-    val amount: Int
-)
+private val activeStatuses = setOf("searching", "assigned", "in_progress", "awaiting_payment", "open")
 
-private val activeOrders = listOf(
-    ActiveOrder("electrician", "Sanjay More", "On the way", "8 min away", "9600", 152),
-    ActiveOrder("plumber", "Vijay Rathod", "Assigned", "Confirming…", "4821", 77)
-)
+fun statusLabel(status: String?): String = when (status) {
+    "searching" -> "Finding worker"
+    "assigned" -> "Assigned"
+    "in_progress" -> "In progress"
+    "awaiting_payment" -> "Awaiting payment"
+    "open" -> "In job pool"
+    "completed" -> "Completed"
+    "cancelled" -> "Cancelled"
+    else -> status ?: ""
+}
+
+fun money(v: Double?): String {
+    if (v == null) return "-"
+    return if (v % 1.0 == 0.0) v.toInt().toString() else v.toString()
+}
 
 @Composable
 fun OrdersScreen() {
+    val context = LocalContext.current
+    val bearer = remember { "Bearer " + (TokenStore(context).getToken() ?: "") }
+    var loading by remember { mutableStateOf(true) }
+    var orders by remember { mutableStateOf<List<OrderDto>>(emptyList()) }
+    var prevActive by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var firstLoad by remember { mutableStateOf(true) }
+    var completedNotice by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            try {
+                val all = ApiClient.api.getOrders(bearer).orders
+                val byId = all.associateBy { it.id }
+                if (!firstLoad) {
+                    val justDone = prevActive.firstOrNull { id -> byId[id]?.status == "completed" }
+                    if (justDone != null) {
+                        val cat = byId[justDone]?.category
+                        completedNotice = Categories.byValue(cat ?: "")?.label ?: "Your service"
+                    }
+                }
+                orders = all.filter { it.status in activeStatuses }
+                prevActive = orders.mapNotNull { it.id }.toSet()
+                firstLoad = false
+            } catch (_: Exception) {
+            } finally {
+                loading = false
+            }
+            delay(5000)
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         TabHeader("Active Orders")
-        if (activeOrders.isEmpty()) {
-            EmptyState("No active orders", "Your ongoing bookings will appear here")
-        } else {
-            LazyColumn(
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+        when {
+            loading -> LoadingBox()
+            orders.isEmpty() -> EmptyState("No active orders", "Book a service and it will show up here")
+            else -> LazyColumn(
+                contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(activeOrders) { order -> ActiveOrderCard(order) }
+                items(orders) { order -> ActiveOrderCard(order) }
             }
         }
+    }
+
+    if (completedNotice != null) {
+        AlertDialog(
+            onDismissRequest = { completedNotice = null },
+            icon = { Icon(Icons.Filled.CheckCircle, null, tint = MaterialTheme.colorScheme.primary) },
+            title = { Text("Payment received") },
+            text = { Text("Your ${completedNotice} service is completed and the payment is done. Thank you for using Karigar!") },
+            confirmButton = { TextButton(onClick = { completedNotice = null }) { Text("OK") } }
+        )
     }
 }
 
 @Composable
-private fun ActiveOrderCard(order: ActiveOrder) {
-    val category = Categories.byValue(order.category)
+private fun ActiveOrderCard(order: OrderDto) {
+    val category = Categories.byValue(order.category ?: "")
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -82,35 +142,47 @@ private fun ActiveOrderCard(order: ActiveOrder) {
                     modifier = Modifier.size(48.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(categoryIcon(order.category), null, tint = MaterialTheme.colorScheme.primary)
+                    Icon(categoryIcon(order.category ?: ""), null, tint = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.size(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(category?.label ?: order.category, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.size(4.dp))
-                        Text(order.worker, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(category?.label ?: (order.category ?: "Service"), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
+                    order.assignedWorker?.name?.let { workerName ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
+                            Spacer(Modifier.size(4.dp))
+                            Text(workerName, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                     }
                 }
-                StatusPill(order.status)
+                StatusPill(statusLabel(order.status))
             }
             Spacer(Modifier.height(14.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline)
             Spacer(Modifier.height(14.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column {
-                    Text("Start OTP", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Lock, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.size(6.dp))
-                        Text(order.startOtp, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp, color = MaterialTheme.colorScheme.primary)
+                val otpToShow = when (order.status) {
+                    "assigned" -> order.startOtp
+                    "in_progress" -> order.endOtp
+                    else -> null
+                }
+                if (otpToShow != null) {
+                    Column {
+                        Text(
+                            if (order.status == "in_progress") "End OTP" else "Start OTP",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Lock, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.size(6.dp))
+                            Text(otpToShow, fontSize = 20.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp, color = MaterialTheme.colorScheme.primary)
+                        }
                     }
+                } else {
+                    Text("${order.durationMinutes ?: 0} min", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(order.eta, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("₹${order.amount}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                }
+                Text("₹${money(order.bill?.total)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }
@@ -150,5 +222,12 @@ fun EmptyState(title: String, subtitle: String) {
         Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
         Spacer(Modifier.height(6.dp))
         Text(subtitle, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+fun LoadingBox() {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
     }
 }

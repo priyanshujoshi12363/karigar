@@ -48,10 +48,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.karigar.app.data.Categories
 import com.karigar.app.data.OrderDraft
+import com.karigar.app.data.TokenStore
+import com.karigar.app.data.remote.ApiClient
+import com.karigar.app.data.remote.CreateOrderRequest
 import com.karigar.app.ui.categoryIcon
 import com.karigar.app.ui.components.PrimaryButton
 import com.karigar.app.ui.theme.brandHeaderBrush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import kotlinx.coroutines.delay
 
 private val durationOptions = listOf(15, 30, 45, 60, 90, 120)
@@ -59,7 +66,11 @@ private val durationOptions = listOf(15, 30, 45, 60, 90, 120)
 @Composable
 fun OrderScreen(onDone: () -> Unit, onBack: () -> Unit) {
     val category = Categories.byValue(OrderDraft.categoryValue ?: "")
-    var paid by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var placed by remember { mutableStateOf(false) }
+    var placing by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -171,13 +182,44 @@ fun OrderScreen(onDone: () -> Unit, onBack: () -> Unit) {
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
         ) {
-            PrimaryButton(
-                text = "Pay ₹${OrderDraft.total}",
-                modifier = Modifier.padding(20.dp)
-            ) { paid = true }
+            Column(modifier = Modifier.padding(20.dp)) {
+                if (error != null) {
+                    Text(error!!, color = Color(0xFFD32F2F), fontSize = 13.sp)
+                    Spacer(Modifier.height(10.dp))
+                }
+                PrimaryButton(
+                    text = "Place Order · ₹${OrderDraft.total}",
+                    loading = placing
+                ) {
+                    scope.launch {
+                        placing = true
+                        error = null
+                        try {
+                            val token = TokenStore(context).getToken()
+                            val resp = ApiClient.api.createOrder(
+                                "Bearer $token",
+                                CreateOrderRequest(
+                                    category = OrderDraft.categoryValue ?: "",
+                                    durationMinutes = OrderDraft.durationMinutes,
+                                    coordinates = listOf(OrderDraft.longitude, OrderDraft.latitude),
+                                    address = OrderDraft.address.ifBlank { null }
+                                )
+                            )
+                            if (resp.success) placed = true
+                            else error = resp.message ?: "Could not place order"
+                        } catch (e: HttpException) {
+                            error = "Server error (${e.code()})"
+                        } catch (e: Exception) {
+                            error = "Cannot reach server. Try again."
+                        } finally {
+                            placing = false
+                        }
+                    }
+                }
+            }
         }
 
-        AnimatedVisibility(visible = paid, enter = fadeIn(tween(200))) {
+        AnimatedVisibility(visible = placed, enter = fadeIn(tween(200))) {
             PaymentSuccessOverlay(onDone = onDone)
         }
     }
@@ -230,7 +272,7 @@ private fun PaymentSuccessOverlay(onDone: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(20.dp))
             Text(
-                "Payment Successful",
+                "Order Placed!",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimary

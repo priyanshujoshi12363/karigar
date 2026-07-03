@@ -1,9 +1,13 @@
 package com.karigar.app
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import com.karigar.app.notifications.registerFcmToken
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -26,9 +30,18 @@ import com.karigar.app.ui.screens.SplashScreen
 import com.karigar.app.ui.theme.KarigarTheme
 
 class MainActivity : ComponentActivity() {
+    private val requestNotifPermission =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        registerFcmToken(this)
+
         setContent {
             KarigarTheme {
                 KarigarApp()
@@ -68,6 +81,7 @@ fun KarigarApp() {
         }
         composable(Routes.AUTH) {
             AuthScreen(onAuthed = {
+                registerFcmToken(context)
                 nav.navigate(Routes.MAIN) {
                     popUpTo(Routes.AUTH) { inclusive = true }
                 }

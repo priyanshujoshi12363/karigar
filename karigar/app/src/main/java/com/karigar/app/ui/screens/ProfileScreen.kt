@@ -33,6 +33,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.karigar.app.data.TokenStore
+import com.karigar.app.data.remote.ApiClient
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +54,22 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun ProfileScreen(onLogout: () -> Unit) {
+    val context = LocalContext.current
+    var name by remember { mutableStateOf("User") }
+    var phone by remember { mutableStateOf("") }
+
+    LaunchedEffect(Unit) {
+        try {
+            val token = TokenStore(context).getToken()
+            val resp = ApiClient.api.getMe("Bearer $token")
+            resp.user?.let {
+                name = it.name ?: "User"
+                phone = it.phone ?: ""
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -66,8 +90,8 @@ fun ProfileScreen(onLogout: () -> Unit) {
                 Icon(Icons.Filled.Person, null, tint = BluePrimary, modifier = Modifier.size(48.dp))
             }
             Spacer(Modifier.height(12.dp))
-            Text("Guest User", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text("+91 98765 43210", fontSize = 14.sp, color = Color.White)
+            Text(name, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(phone, fontSize = 14.sp, color = Color.White)
         }
 
         Spacer(Modifier.height(16.dp))

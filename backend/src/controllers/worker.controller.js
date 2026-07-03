@@ -1,3 +1,4 @@
+import { serverError } from "../utils/handleError.js"
 import Worker from "../models/worker.model.js"
 import { generateToken } from "../utils/generateToken.js"
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js"
@@ -85,7 +86,7 @@ export const registerWorker = async (req, res) => {
         const workedWithCompany =
             req.body.workedWithCompany === true || req.body.workedWithCompany === "true"
 
-        if (!phone) {
+        if (!phone || typeof phone !== "string") {
             return res.status(400).json({ success: false, message: "phone is required" })
         }
         if (!name) {
@@ -146,7 +147,7 @@ export const registerWorker = async (req, res) => {
             worker: formatWorker(worker),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -154,7 +155,7 @@ export const loginWorker = async (req, res) => {
     try {
         const { phone, expoToken } = req.body
 
-        if (!phone) {
+        if (!phone || typeof phone !== "string") {
             return res.status(400).json({ success: false, message: "phone is required" })
         }
 
@@ -177,7 +178,20 @@ export const loginWorker = async (req, res) => {
             worker: formatWorker(worker),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
+    }
+}
+
+export const saveWorkerPushToken = async (req, res) => {
+    try {
+        const { token } = req.body
+        if (!token) {
+            return res.status(400).json({ success: false, message: "token is required" })
+        }
+        await Worker.findByIdAndUpdate(req.workerId, { fcmToken: token })
+        return res.status(200).json({ success: true, message: "Push token saved" })
+    } catch (err) {
+        return serverError(res, err)
     }
 }
 
@@ -194,7 +208,7 @@ export const getWorkerProfile = async (req, res) => {
             worker: formatWorker(worker),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -229,7 +243,7 @@ export const updateWorkerLocation = async (req, res) => {
             location: worker.location,
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -284,6 +298,6 @@ export const getNearbyWorkers = async (req, res) => {
             workers: result,
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }

@@ -22,3 +22,7 @@ tmp/
 Thumbs.db
 .vscode/
 .idea/
+
+# firebase service account (SECRET private key)
+*firebase-adminsdk*.json
+serviceAccountKey.json

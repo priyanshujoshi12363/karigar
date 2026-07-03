@@ -1,3 +1,4 @@
+import { serverError } from "../utils/handleError.js"
 import mongoose from "mongoose"
 import Worker from "../models/worker.model.js"
 import User from "../models/user.model.js"
@@ -62,7 +63,7 @@ export const explore = async (req, res) => {
             nearbyWorkers,
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -123,7 +124,7 @@ export const searchWorkers = async (req, res) => {
             workers: workers.map((w) => publicWorker(w, withDistance)),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -150,7 +151,7 @@ export const getWorkerById = async (req, res) => {
             worker: publicWorker(worker),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -189,7 +190,7 @@ export const getHistory = async (req, res) => {
             addressHistory,
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -200,6 +201,6 @@ export const clearHistory = async (req, res) => {
         })
         return res.status(200).json({ success: true, message: "History cleared" })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }

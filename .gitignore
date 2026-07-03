@@ -24,3 +24,7 @@ Thumbs.db
 *.aab
 *.keystore
 *.jks
+
+# firebase
+**/google-services.json
+**/*firebase-adminsdk*.json

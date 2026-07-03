@@ -1,3 +1,4 @@
+import { serverError } from "../utils/handleError.js"
 import mongoose from "mongoose"
 import Order from "../models/order.model.js"
 import User from "../models/user.model.js"
@@ -5,6 +6,48 @@ import Worker from "../models/worker.model.js"
 import { CATEGORY_VALUES } from "../constants/categories.js"
 import { computeBill } from "../utils/pricing.js"
 import { buildCandidates, startDispatch, advance, ensureProgress } from "../services/orderDispatch.js"
+import { sendPush } from "../utils/sendPush.js"
+
+const notifyCurrentCandidate = async (order) => {
+    try {
+        const i = order.currentIndex
+        if (i < 0 || !order.candidates[i]) return
+        const worker = await Worker.findById(order.candidates[i].worker)
+        if (worker?.fcmToken) {
+            await sendPush(
+                worker.fcmToken,
+                "New job request",
+                `${order.category} · ₹${order.bill?.workAmount || 0} · tap to accept`,
+                { orderId: String(order._id), type: "new_offer" }
+            )
+        }
+    } catch (e) {
+        console.error("notifyCurrentCandidate:", e.message)
+    }
+}
+
+const notifyUser = async (order, title, body, type) => {
+    try {
+        const user = await User.findById(order.user)
+        if (user?.fcmToken) {
+            await sendPush(user.fcmToken, title, body, { orderId: String(order._id), type })
+        }
+    } catch (e) {
+        console.error("notifyUser:", e.message)
+    }
+}
+
+const notifyAssignedWorker = async (order, title, body, type) => {
+    try {
+        if (!order.assignedWorker) return
+        const worker = await Worker.findById(order.assignedWorker)
+        if (worker?.fcmToken) {
+            await sendPush(worker.fcmToken, title, body, { orderId: String(order._id), type })
+        }
+    } catch (e) {
+        console.error("notifyAssignedWorker:", e.message)
+    }
+}
 
 const MIN_MINUTES = 15
 const MAX_MINUTES = 480
@@ -94,23 +137,35 @@ const formatOfferForWorker = (order, workerId) => {
     }
 }
 
-const formatAssignedForWorker = (order) => ({
-    id: order._id,
-    category: order.category,
-    durationMinutes: order.durationMinutes,
-    notes: order.notes,
-    earning: order.bill?.workAmount,
-    status: order.status,
-    customer: {
-        phone: order.userPhone,
-        location: order.location,
-        address: order.address,
-    },
-    acceptedAt: order.acceptedAt,
-    startedAt: order.startedAt,
-    completedAt: order.completedAt,
-    createdAt: order.createdAt,
-})
+const formatAssignedForWorker = (order) => {
+    const base = {
+        id: order._id,
+        category: order.category,
+        durationMinutes: order.durationMinutes,
+        notes: order.notes,
+        earning: order.bill?.workAmount,
+        status: order.status,
+        customer: {
+            phone: order.userPhone,
+            location: order.location,
+            address: order.address,
+        },
+        acceptedAt: order.acceptedAt,
+        startedAt: order.startedAt,
+        completedAt: order.completedAt,
+        createdAt: order.createdAt,
+    }
+    if (order.status === "awaiting_payment") {
+        const payee = process.env.PAYEE_UPI || "karigar@upi"
+        base.payment = {
+            amount: order.bill?.total,
+            workerPayout: order.bill?.workAmount,
+            platformFee: order.bill?.platformFee,
+            upiUri: `upi://pay?pa=${payee}&pn=Karigar&am=${order.bill?.total}&cu=INR&tn=Order-${order._id}`,
+        }
+    }
+    return base
+}
 
 export const getQuote = (req, res) => {
     const durationMinutes = Number(req.query.durationMinutes)
@@ -165,6 +220,8 @@ export const createOrder = async (req, res) => {
         startDispatch(order)
         await order.save()
 
+        if (candidates.length) notifyCurrentCandidate(order)
+
         return res.status(201).json({
             success: true,
             message: candidates.length
@@ -173,7 +230,7 @@ export const createOrder = async (req, res) => {
             order: formatUserOrder(order),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -188,7 +245,7 @@ export const getUserOrders = async (req, res) => {
             orders: orders.map(formatUserOrder),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -214,7 +271,7 @@ export const getUserOrder = async (req, res) => {
 
         return res.status(200).json({ success: true, order: formatUserOrder(order) })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -240,7 +297,7 @@ export const cancelOrder = async (req, res) => {
 
         return res.status(200).json({ success: true, message: "Order cancelled" })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -284,7 +341,7 @@ export const payOrder = async (req, res) => {
             },
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -317,7 +374,7 @@ export const startWork = async (req, res) => {
 
         return res.status(200).json({ success: true, message: "Work started" })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -348,7 +405,7 @@ export const finishWork = async (req, res) => {
 
         return res.status(200).json({ success: true, message: "Work completed, awaiting payment" })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -378,7 +435,7 @@ export const getWorkerOffers = async (req, res) => {
 
         return res.status(200).json({ success: true, count: offers.length, offers })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -423,6 +480,7 @@ export const respondToOffer = async (req, res) => {
             order.offerExpiresAt = null
             order.startOtp = generateOtp()
             await order.save()
+            notifyUser(order, "Worker on the way", "A worker accepted your request", "assigned")
             return res.status(200).json({
                 success: true,
                 message: "Order accepted",
@@ -432,9 +490,10 @@ export const respondToOffer = async (req, res) => {
 
         advance(order, "rejected")
         await order.save()
+        if (order.status === "searching") notifyCurrentCandidate(order)
         return res.status(200).json({ success: true, message: "Offer rejected" })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -488,7 +547,7 @@ export const getOpenJobs = async (req, res) => {
 
         return res.status(200).json({ success: true, count: jobs.length, jobs })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -521,13 +580,15 @@ export const pickJob = async (req, res) => {
         order.startOtp = generateOtp()
         await order.save()
 
+        notifyUser(order, "Worker on the way", "A worker picked your job", "assigned")
+
         return res.status(200).json({
             success: true,
             message: "Job picked",
             order: formatAssignedForWorker(order),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -540,6 +601,46 @@ export const getWorkerOrders = async (req, res) => {
             orders: orders.map(formatAssignedForWorker),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
+    }
+}
+
+export const confirmPayment = async (req, res) => {
+    try {
+        const { id } = req.params
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "invalid order id" })
+        }
+
+        const order = await Order.findById(id)
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" })
+        }
+        if (!order.assignedWorker || !order.assignedWorker.equals(req.workerId)) {
+            return res.status(403).json({ success: false, message: "not your order" })
+        }
+        if (order.status !== "awaiting_payment") {
+            return res.status(409).json({ success: false, message: "order is not awaiting payment" })
+        }
+
+        order.payment = {
+            status: "paid",
+            amount: order.bill.total,
+            workerPayout: order.bill.workAmount,
+            platformFee: order.bill.platformFee,
+            method: "upi",
+            transactionId: "TXN" + Date.now() + Math.floor(Math.random() * 1000),
+            paidAt: new Date(),
+        }
+        order.status = "completed"
+        order.completedAt = new Date()
+        await order.save()
+
+        notifyUser(order, "Payment received", "Your service is completed. Thank you!", "completed")
+        notifyAssignedWorker(order, "Payment received", "Order completed successfully", "completed")
+
+        return res.status(200).json({ success: true, message: "Payment confirmed, order completed" })
+    } catch (err) {
+        return serverError(res, err)
     }
 }

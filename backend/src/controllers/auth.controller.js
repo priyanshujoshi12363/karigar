@@ -1,6 +1,16 @@
+import { serverError } from "../utils/handleError.js"
 import User from "../models/user.model.js"
 import { generateToken } from "../utils/generateToken.js"
 import { reverseGeocode } from "../utils/reverseGeocode.js"
+import { getAuth } from "../config/firebase.js"
+
+const resolveVerifiedPhone = async (body) => {
+    if (body.idToken) {
+        const decoded = await getAuth().verifyIdToken(body.idToken)
+        if (decoded.phone_number) return decoded.phone_number
+    }
+    return typeof body.phone === "string" ? body.phone : ""
+}
 
 const formatUser = (user) => ({
     id: user._id,
@@ -17,6 +27,19 @@ const formatUser = (user) => ({
     createdAt: user.createdAt,
 })
 
+export const savePushToken = async (req, res) => {
+    try {
+        const { token } = req.body
+        if (!token) {
+            return res.status(400).json({ success: false, message: "token is required" })
+        }
+        await User.findByIdAndUpdate(req.userId, { fcmToken: token })
+        return res.status(200).json({ success: true, message: "Push token saved" })
+    } catch (err) {
+        return serverError(res, err)
+    }
+}
+
 export const verifyToken = async (req, res) => {
     try {
         const user = await User.findById(req.userId)
@@ -25,13 +48,20 @@ export const verifyToken = async (req, res) => {
         }
         return res.status(200).json({ success: true, message: "Token valid", user: formatUser(user) })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
 export const register = async (req, res) => {
     try {
-        const { phone, name, address, coordinates, expoToken } = req.body
+        const { name, address, coordinates, expoToken } = req.body
+
+        let phone
+        try {
+            phone = await resolveVerifiedPhone(req.body)
+        } catch (e) {
+            return res.status(401).json({ success: false, message: "Invalid or expired OTP verification" })
+        }
 
         if (!phone) {
             return res.status(400).json({ success: false, message: "phone is required" })
@@ -67,13 +97,20 @@ export const register = async (req, res) => {
             user: formatUser(user),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
 export const login = async (req, res) => {
     try {
-        const { phone, expoToken } = req.body
+        const { expoToken } = req.body
+
+        let phone
+        try {
+            phone = await resolveVerifiedPhone(req.body)
+        } catch (e) {
+            return res.status(401).json({ success: false, message: "Invalid or expired OTP verification" })
+        }
 
         if (!phone) {
             return res.status(400).json({ success: false, message: "phone is required" })
@@ -100,7 +137,7 @@ export const login = async (req, res) => {
             user: formatUser(user),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -117,7 +154,7 @@ export const getProfile = async (req, res) => {
             user: formatUser(user),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }
 
@@ -180,6 +217,6 @@ export const updateAddress = async (req, res) => {
             user: formatUser(user),
         })
     } catch (err) {
-        return res.status(500).json({ success: false, message: err.message })
+        return serverError(res, err)
     }
 }

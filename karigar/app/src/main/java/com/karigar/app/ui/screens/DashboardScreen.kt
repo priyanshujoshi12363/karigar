@@ -34,10 +34,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import com.karigar.app.data.remote.ApiClient
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +59,17 @@ import java.util.Calendar
 fun DashboardScreen(onSelectCategory: (String) -> Unit) {
     var query by remember { mutableStateOf("") }
     var skillFilter by remember { mutableStateOf("all") }
+    var cats by remember { mutableStateOf(Categories.all) }
+
+    LaunchedEffect(Unit) {
+        try {
+            val resp = ApiClient.api.getCategories()
+            if (resp.success && resp.categories.isNotEmpty()) {
+                cats = resp.categories.map { Category(it.value, it.label, it.skill, "") }
+            }
+        } catch (_: Exception) {
+        }
+    }
 
     val greeting = remember {
         when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
@@ -71,7 +84,7 @@ fun DashboardScreen(onSelectCategory: (String) -> Unit) {
             .mapNotNull { Categories.byValue(it) }
     }
 
-    val filtered = Categories.all.filter { c ->
+    val filtered = cats.filter { c ->
         (skillFilter == "all" || c.skill == skillFilter) &&
             (query.isBlank() || c.label.contains(query, true) || c.value.contains(query, true))
     }

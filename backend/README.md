@@ -13,7 +13,20 @@ Built with **Node.js + Express + MongoDB (Mongoose)**.
 - **Geo search** — find workers within a radius using MongoDB `2dsphere` (`$geoNear`).
 - **Reverse geocoding** via OpenStreetMap Nominatim (coordinates → address).
 - **Instant-order dispatch** — notifies nearest matching worker first, falls through on reject/timeout, then an open job pool.
+- **Push notifications** via Firebase Cloud Messaging (order events to users & workers).
+- **Firebase phone-OTP verification** — client verifies OTP, backend verifies the Firebase ID token.
 - Flat pricing: ₹150/hour + ₹2 platform fee.
+
+## Production hardening
+
+- `helmet` for secure HTTP headers.
+- `cors` (configurable allow-list via `ALLOWED_ORIGINS`).
+- `express-rate-limit` — global limit + stricter limit on `/auth`.
+- NoSQL-injection sanitizer (strips `$`/`.` keys from request bodies).
+- `trust proxy` enabled for correct client IPs behind Render.
+- Sanitized errors — 500s never leak internal messages (logged server-side only).
+- Startup env validation (fails fast if `MONGODB_URI` / `JWT_SECRET` / `ENCRYPTION_KEY` missing).
+- Secrets (`.env`, Firebase service account, `google-services.json`) are git-ignored.
 
 ## Tech stack
 
