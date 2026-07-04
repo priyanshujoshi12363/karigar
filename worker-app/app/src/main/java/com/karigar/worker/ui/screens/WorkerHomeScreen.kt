@@ -1,6 +1,9 @@
 package com.karigar.worker.ui.screens
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,7 +22,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -30,6 +37,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,10 +62,12 @@ import androidx.compose.ui.unit.sp
 import com.karigar.worker.data.Categories
 import com.karigar.worker.data.TokenStore
 import com.karigar.worker.data.remote.ApiClient
+import com.karigar.worker.data.remote.AvailabilityRequest
 import com.karigar.worker.data.remote.JobDto
 import com.karigar.worker.data.remote.OfferDto
 import com.karigar.worker.data.remote.OtpRequest
 import com.karigar.worker.data.remote.RespondRequest
+import com.karigar.worker.data.remote.UpdateLocationRequest
 import com.karigar.worker.data.remote.WorkerOrderDto
 import com.karigar.worker.ui.categoryIcon
 import com.karigar.worker.ui.components.PrimaryButton
@@ -73,6 +84,7 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
     val bearer = remember { "Bearer " + (TokenStore(context).getToken() ?: "") }
 
     var loading by remember { mutableStateOf(true) }
+    var online by remember { mutableStateOf(false) }
     var offers by remember { mutableStateOf<List<OfferDto>>(emptyList()) }
     var jobs by remember { mutableStateOf<List<JobDto>>(emptyList()) }
     var myOrders by remember { mutableStateOf<List<WorkerOrderDto>>(emptyList()) }
@@ -82,10 +94,12 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
     var otpMode by remember { mutableStateOf("start") }
     var otpValue by remember { mutableStateOf("") }
     var payFor by remember { mutableStateOf<WorkerOrderDto?>(null) }
+    var showLocationPicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(reload) {
         loading = true
         try {
+            online = ApiClient.api.workerMe(bearer).worker?.isOnline ?: online
             offers = ApiClient.api.getOffers(bearer).offers
             jobs = ApiClient.api.getJobs(bearer).jobs
             myOrders = ApiClient.api.getWorkerOrders(bearer).orders
@@ -106,14 +120,32 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
         }
     }
 
+    fun toggleOnline(value: Boolean) {
+        online = value
+        scope.launch {
+            try {
+                val r = ApiClient.api.setAvailability(bearer, AvailabilityRequest(value))
+                online = r.isOnline ?: value
+            } catch (_: Exception) {
+                online = !value
+            }
+            reload++
+        }
+    }
+
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
             modifier = Modifier.fillMaxWidth().background(brandHeaderBrush()).padding(start = 20.dp, end = 12.dp, top = 30.dp, bottom = 18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("My Work", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            IconButton(onClick = { showLocationPicker = true }) {
+                Icon(Icons.Filled.MyLocation, "Set location", tint = Color.White)
+            }
             IconButton(onClick = onLogout) { Icon(Icons.AutoMirrored.Filled.Logout, "Logout", tint = Color.White) }
         }
+
+        AvailabilityBar(online = online, onToggle = { toggleOnline(it) })
 
         if (loading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -204,6 +236,65 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
             onDone = { payFor = null; reload++ }
         )
     }
+
+    if (showLocationPicker) {
+        LocationPickerScreen(
+            initialLat = 21.1458,
+            initialLng = 79.0882,
+            onConfirm = { la, ln, addr ->
+                showLocationPicker = false
+                scope.launch {
+                    try {
+                        ApiClient.api.updateLocation(bearer, UpdateLocationRequest(listOf(ln, la), addr))
+                    } catch (_: Exception) {
+                    }
+                }
+            },
+            onDismiss = { showLocationPicker = false }
+        )
+    }
+}
+
+@Composable
+private fun AvailabilityBar(online: Boolean, onToggle: (Boolean) -> Unit) {
+    val activeColor = Color(0xFF16A34A)
+    val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(if (online) activeColor else idleColor)
+        )
+        Spacer(Modifier.size(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                if (online) "You're online" else "You're offline",
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                color = if (online) activeColor else MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                if (online) "Receiving new job requests" else "Go online to start getting work",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(
+            checked = online,
+            onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = activeColor
+            )
+        )
+    }
 }
 
 @Composable
@@ -237,7 +328,10 @@ private fun OfferCard(offer: OfferDto, onAccept: () -> Unit, onReject: () -> Uni
                     Text(Categories.label(offer.category), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
                     Text("${offer.durationMinutes ?: 0} min · ${offer.distanceKm ?: 0.0} km away", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("₹${money(offer.earning)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("₹${money(offer.earning)}", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("you collect", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -270,6 +364,33 @@ private fun JobCard(job: JobDto, onPick: () -> Unit) {
 
 @Composable
 private fun MyJobCard(order: WorkerOrderDto, onStart: () -> Unit, onFinish: () -> Unit, onCollect: () -> Unit) {
+    val context = LocalContext.current
+    val coords = order.customer?.location?.coordinates
+    val hasCoords = coords != null && coords.size == 2
+
+    fun callCustomer() {
+        val phone = order.customer?.phone ?: return
+        try {
+            context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
+        } catch (_: Exception) {
+        }
+    }
+
+    fun navigateToCustomer() {
+        if (!hasCoords) return
+        val lat = coords!![1]
+        val lng = coords[0]
+        val uri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng&travelmode=driving")
+        try {
+            context.startActivity(Intent(Intent.ACTION_VIEW, uri).setPackage("com.google.android.apps.maps"))
+        } catch (_: Exception) {
+            try {
+                context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+            } catch (_: Exception) {
+            }
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -282,20 +403,62 @@ private fun MyJobCard(order: WorkerOrderDto, onStart: () -> Unit, onFinish: () -
                 Spacer(Modifier.size(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(Categories.label(order.category), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Filled.Person, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(14.dp))
-                        Spacer(Modifier.size(4.dp))
-                        Text(order.customer?.phone ?: "", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
+                    Text("Customer details below", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(statusLabel(order.status), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.primary)
             }
+
             order.customer?.address?.let { addr ->
                 if (addr.isNotBlank()) {
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(10.dp))
                     Text(addr, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
+
+            Spacer(Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable { callCustomer() }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Filled.Phone, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.size(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Customer phone", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(order.customer?.phone ?: "—", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
+                }
+                Text("Call", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+
+            if (hasCoords) {
+                Spacer(Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable { navigateToCustomer() }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Filled.Place, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.size(10.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Customer location", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("%.5f, %.5f".format(coords!![1], coords[0]), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Navigation, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(4.dp))
+                        Text("Directions", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+
             Spacer(Modifier.height(14.dp))
             when (order.status) {
                 "assigned" -> PrimaryButton(text = "Enter Start OTP") { onStart() }
@@ -334,12 +497,25 @@ private fun PaymentOverlay(order: WorkerOrderDto, bearer: String, onDone: () -> 
                     Spacer(Modifier.height(4.dp))
                     Text("Service completed", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    Text("Collect Payment", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text("Collect from customer", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.height(6.dp))
-                    Text("₹${money(order.payment?.amount)}", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text("₹${money(order.payment?.amount)}", fontSize = 44.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            "Service ₹${money(order.payment?.workerPayout)}  +  Platform fee ₹${money(order.payment?.platformFee)}",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     Spacer(Modifier.height(14.dp))
                     Text(
-                        "Collect cash or UPI from the customer, then tap the button below to complete the order.",
+                        "Collect the full ₹${money(order.payment?.amount)} (cash or UPI) from the customer, then tap below. The platform fee is later settled from your payout.",
                         fontSize = 13.sp,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

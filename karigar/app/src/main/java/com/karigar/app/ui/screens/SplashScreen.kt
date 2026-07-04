@@ -3,6 +3,7 @@ package com.karigar.app.ui.screens
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,10 +11,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.res.painterResource
+import com.karigar.app.R
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -77,18 +79,15 @@ fun SplashScreen(onNavigate: (String) -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(
+            Image(
+                painter = painterResource(id = R.drawable.karigar_logo),
+                contentDescription = "Karigar",
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(150.dp)
                     .scale(scale.value)
                     .alpha(alpha.value)
-                    .clip(CircleShape),
-                color = MaterialTheme.colorScheme.onPrimary
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(text = "K", fontSize = 64.sp, fontWeight = FontWeight.Bold, color = BluePrimary)
-                }
-            }
+                    .clip(RoundedCornerShape(32.dp))
+            )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Karigar",

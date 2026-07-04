@@ -1,18 +1,60 @@
 package com.karigar.worker.data.remote
 
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface ApiService {
     @POST("worker/login")
     suspend fun workerLogin(@Body body: LoginRequest): AuthResponse
 
+    @Multipart
+    @POST("worker/register")
+    suspend fun registerWorker(
+        @Part("phone") phone: RequestBody,
+        @Part("idToken") idToken: RequestBody?,
+        @Part("name") name: RequestBody,
+        @Part("address") address: RequestBody?,
+        @Part("coordinates") coordinates: RequestBody?,
+        @Part("categories") categories: RequestBody,
+        @Part("experienceYears") experienceYears: RequestBody,
+        @Part("workedWithCompany") workedWithCompany: RequestBody,
+        @Part("companyName") companyName: RequestBody?,
+        @Part("aadharNumber") aadharNumber: RequestBody,
+        @Part aadharPhoto: MultipartBody.Part
+    ): AuthResponse
+
     @GET("worker/me")
-    suspend fun workerMe(@Header("Authorization") bearer: String): SimpleResponse
+    suspend fun workerMe(@Header("Authorization") bearer: String): WorkerProfileResponse
+
+    @GET("worker/stats")
+    suspend fun getStats(@Header("Authorization") bearer: String): WorkerStatsResponse
+
+    @PATCH("worker/availability")
+    suspend fun setAvailability(
+        @Header("Authorization") bearer: String,
+        @Body body: AvailabilityRequest
+    ): AvailabilityResponse
+
+    @GET("geo/reverse")
+    suspend fun reverseGeocode(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double
+    ): GeoResponse
+
+    @PATCH("worker/location")
+    suspend fun updateLocation(
+        @Header("Authorization") bearer: String,
+        @Body body: UpdateLocationRequest
+    ): SimpleResponse
 
     @PATCH("worker/push-token")
     suspend fun savePushToken(

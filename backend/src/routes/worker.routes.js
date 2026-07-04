@@ -7,6 +7,8 @@ import {
     updateWorkerLocation,
     getNearbyWorkers,
     saveWorkerPushToken,
+    setWorkerAvailability,
+    getWorkerStats,
 } from "../controllers/worker.controller.js"
 import {
     getWorkerOffers,
@@ -28,7 +30,9 @@ router.get("/categories", getCategories)
 router.post("/register", upload.single("aadharPhoto"), registerWorker)
 router.post("/login", loginWorker)
 router.get("/me", protectWorker, getWorkerProfile)
+router.get("/stats", protectWorker, getWorkerStats)
 router.patch("/location", protectWorker, updateWorkerLocation)
+router.patch("/availability", protectWorker, setWorkerAvailability)
 router.patch("/push-token", protectWorker, saveWorkerPushToken)
 router.get("/nearby", protect, getNearbyWorkers)
 

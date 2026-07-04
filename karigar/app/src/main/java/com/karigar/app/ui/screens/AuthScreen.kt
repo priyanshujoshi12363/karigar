@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +48,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import com.karigar.app.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -94,6 +97,9 @@ fun AuthScreen(onAuthed: () -> Unit) {
     val store = remember { TokenStore(context) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var showPicker by remember { mutableStateOf(false) }
+    var regLat by remember { mutableStateOf<Double?>(null) }
+    var regLng by remember { mutableStateOf<Double?>(null) }
 
     fun callBackend(idToken: String?) {
         scope.launch {
@@ -104,7 +110,9 @@ fun AuthScreen(onAuthed: () -> Unit) {
                             phone = "+91$phone",
                             name = name,
                             idToken = idToken,
-                            address = address.ifBlank { null }
+                            address = address.ifBlank { null },
+                            coordinates = if (regLat != null && regLng != null)
+                                listOf(regLng!!, regLat!!) else null
                         )
                     )
                 } else {
@@ -194,6 +202,7 @@ fun AuthScreen(onAuthed: () -> Unit) {
         signIn(PhoneAuthProvider.getCredential(id, otp))
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(
             modifier = Modifier
@@ -206,12 +215,11 @@ fun AuthScreen(onAuthed: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
-                    modifier = Modifier.size(72.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onPrimary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("K", fontSize = 40.sp, fontWeight = FontWeight.Bold, color = BluePrimary)
-                }
+                Image(
+                    painter = painterResource(id = R.drawable.karigar_logo),
+                    contentDescription = "Karigar",
+                    modifier = Modifier.size(80.dp).clip(RoundedCornerShape(20.dp))
+                )
                 Spacer(Modifier.height(16.dp))
                 Text(
                     if (isRegister) "Create your account" else "Welcome back",
@@ -261,9 +269,10 @@ fun AuthScreen(onAuthed: () -> Unit) {
                                 value = address,
                                 onValueChange = { address = it },
                                 label = { Text("Address") },
+                                placeholder = { Text("Tap the map icon to set on map") },
                                 leadingIcon = { Icon(Icons.Filled.LocationOn, null) },
                                 trailingIcon = {
-                                    TextButton(onClick = { address = "Using current location…" }) {
+                                    TextButton(onClick = { showPicker = true }) {
                                         Icon(Icons.Filled.MyLocation, null, modifier = Modifier.size(18.dp))
                                     }
                                 },
@@ -358,6 +367,21 @@ fun AuthScreen(onAuthed: () -> Unit) {
                 }
             }
         }
+    }
+
+    if (showPicker) {
+        LocationPickerScreen(
+            initialLat = regLat ?: 21.1458,
+            initialLng = regLng ?: 79.0882,
+            onConfirm = { la, ln, addr ->
+                regLat = la
+                regLng = ln
+                address = addr
+                showPicker = false
+            },
+            onDismiss = { showPicker = false }
+        )
+    }
     }
 }
 

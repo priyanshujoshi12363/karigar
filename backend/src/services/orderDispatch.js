@@ -1,7 +1,9 @@
 import Worker from "../models/worker.model.js"
 
 export const SEARCH_RADIUS_KM = 5
-export const OFFER_TTL_SECONDS = Number(process.env.OFFER_TTL_SECONDS) || 60
+export const OPEN_POOL_RADIUS_KM = Number(process.env.OPEN_POOL_RADIUS_KM) || 15
+export const OFFER_TTL_SECONDS = Number(process.env.OFFER_TTL_SECONDS) || 30
+export const OPEN_POOL_TTL_SECONDS = Number(process.env.OPEN_POOL_TTL_SECONDS) || 900
 
 export const buildCandidates = async (category, lng, lat) => {
     const workers = await Worker.aggregate([
@@ -11,7 +13,7 @@ export const buildCandidates = async (category, lng, lat) => {
                 distanceField: "distance",
                 maxDistance: SEARCH_RADIUS_KM * 1000,
                 spherical: true,
-                query: { categories: category },
+                query: { categories: category, isOnline: true },
             },
         },
         { $limit: 50 },
@@ -31,11 +33,16 @@ const notifyIndex = (order, i) => {
     order.offerExpiresAt = new Date(Date.now() + OFFER_TTL_SECONDS * 1000)
 }
 
+const goOpen = (order) => {
+    order.status = "open"
+    order.currentIndex = -1
+    order.offerExpiresAt = null
+    order.openExpiresAt = new Date(Date.now() + OPEN_POOL_TTL_SECONDS * 1000)
+}
+
 export const startDispatch = (order) => {
     if (!order.candidates.length) {
-        order.status = "open"
-        order.currentIndex = -1
-        order.offerExpiresAt = null
+        goOpen(order)
         return order
     }
     order.status = "searching"
@@ -52,9 +59,7 @@ export const advance = (order, markStatus) => {
 
     const nextIdx = order.candidates.findIndex((c) => c.status === "pending")
     if (nextIdx === -1) {
-        order.status = "open"
-        order.currentIndex = -1
-        order.offerExpiresAt = null
+        goOpen(order)
         return order
     }
 
@@ -69,6 +74,14 @@ export const ensureProgress = (order) => {
         order.offerExpiresAt.getTime() < Date.now()
     ) {
         advance(order, "skipped")
+    }
+    if (
+        order.status === "open" &&
+        order.openExpiresAt &&
+        order.openExpiresAt.getTime() < Date.now()
+    ) {
+        order.status = "expired"
+        order.openExpiresAt = null
     }
     return order
 }

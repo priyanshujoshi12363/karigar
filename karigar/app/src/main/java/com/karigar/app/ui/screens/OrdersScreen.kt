@@ -27,14 +27,17 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,11 +49,12 @@ import androidx.compose.ui.unit.sp
 import com.karigar.app.data.Categories
 import com.karigar.app.data.TokenStore
 import com.karigar.app.data.remote.ApiClient
+import com.karigar.app.data.remote.BoostRequest
 import com.karigar.app.data.remote.OrderDto
 import com.karigar.app.ui.categoryIcon
 import com.karigar.app.ui.theme.brandHeaderBrush
 
-private val activeStatuses = setOf("searching", "assigned", "in_progress", "awaiting_payment", "open")
+private val activeStatuses = setOf("searching", "assigned", "in_progress", "awaiting_payment", "open", "expired")
 
 fun statusLabel(status: String?): String = when (status) {
     "searching" -> "Finding worker"
@@ -58,6 +62,7 @@ fun statusLabel(status: String?): String = when (status) {
     "in_progress" -> "In progress"
     "awaiting_payment" -> "Awaiting payment"
     "open" -> "In job pool"
+    "expired" -> "No worker found"
     "completed" -> "Completed"
     "cancelled" -> "Cancelled"
     else -> status ?: ""
@@ -71,12 +76,33 @@ fun money(v: Double?): String {
 @Composable
 fun OrdersScreen() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val bearer = remember { "Bearer " + (TokenStore(context).getToken() ?: "") }
     var loading by remember { mutableStateOf(true) }
     var orders by remember { mutableStateOf<List<OrderDto>>(emptyList()) }
     var prevActive by remember { mutableStateOf<Set<String>>(emptySet()) }
     var firstLoad by remember { mutableStateOf(true) }
     var completedNotice by remember { mutableStateOf<String?>(null) }
+    var boostingId by remember { mutableStateOf<String?>(null) }
+
+    suspend fun refresh() {
+        try {
+            orders = ApiClient.api.getOrders(bearer).orders.filter { it.status in activeStatuses }
+        } catch (_: Exception) {
+        }
+    }
+
+    fun boost(orderId: String, amount: Int) {
+        scope.launch {
+            boostingId = orderId
+            try {
+                ApiClient.api.boostOrder(bearer, orderId, BoostRequest(amount))
+            } catch (_: Exception) {
+            }
+            boostingId = null
+            refresh()
+        }
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -111,7 +137,13 @@ fun OrdersScreen() {
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(orders) { order -> ActiveOrderCard(order) }
+                items(orders) { order ->
+                    ActiveOrderCard(
+                        order = order,
+                        boosting = boostingId == order.id,
+                        onBoost = { amount -> order.id?.let { boost(it, amount) } }
+                    )
+                }
             }
         }
     }
@@ -128,7 +160,7 @@ fun OrdersScreen() {
 }
 
 @Composable
-private fun ActiveOrderCard(order: OrderDto) {
+private fun ActiveOrderCard(order: OrderDto, boosting: Boolean, onBoost: (Int) -> Unit) {
     val category = Categories.byValue(order.category ?: "")
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -183,6 +215,34 @@ private fun ActiveOrderCard(order: OrderDto) {
                     Text("${order.durationMinutes ?: 0} min", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text("₹${money(order.bill?.total)}", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
+            if (order.status == "expired") {
+                Spacer(Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "No worker accepted your request. Increase the pay to try again — the nearest workers get notified first.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(12.dp))
+                if (boosting) {
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, modifier = Modifier.size(22.dp), color = MaterialTheme.colorScheme.primary)
+                    }
+                } else {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf(20, 50, 100).forEach { amt ->
+                            OutlinedButton(
+                                onClick = { onBoost(amt) },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 10.dp)
+                            ) {
+                                Text("+₹$amt", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

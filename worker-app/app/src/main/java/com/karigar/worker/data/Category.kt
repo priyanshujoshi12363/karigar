@@ -1,23 +1,56 @@
 package com.karigar.worker.data
 
-data class Category(val value: String, val label: String)
+data class Category(val value: String, val label: String, val skill: String)
 
 object Categories {
-    private val labels = mapOf(
-        "maid" to "Maid / Cleaning", "cook" to "Cook", "cook_catering" to "Catering Cook",
-        "babysitter" to "Babysitter", "elderly_care" to "Elderly Care", "electrician" to "Electrician",
-        "plumber" to "Plumber", "carpenter" to "Carpenter", "painter" to "Painter", "mason" to "Mason",
-        "construction_worker" to "Construction Worker", "farm_labour" to "Farm Labour", "welder" to "Welder",
-        "fabricator" to "Fabricator", "tile_marble" to "Tile / Marble", "pop_ceiling" to "POP / Ceiling",
-        "ac_technician" to "AC Technician", "appliance_repair" to "Appliance Repair", "ro_technician" to "RO Technician",
-        "water_tanker" to "Water Tanker", "borewell" to "Borewell", "solar_technician" to "Solar Technician",
-        "mobile_repair" to "Mobile Repair", "cctv" to "CCTV Install", "mechanic" to "Mechanic",
-        "driver" to "Driver", "delivery" to "Delivery", "packers_movers" to "Packers & Movers",
-        "gardener" to "Gardener", "pest_control" to "Pest Control", "security_guard" to "Security Guard",
-        "barber" to "Barber", "beautician" to "Beautician", "tailor" to "Tailor", "laundry" to "Laundry",
-        "cleaner_commercial" to "Office Cleaner", "photographer" to "Photographer", "event_helper" to "Event Helper",
-        "tutor" to "Tutor", "priest" to "Priest / Pandit", "other" to "Other"
+    const val SKILLED = "skilled"
+    const val UNSKILLED = "unskilled"
+
+    val all: List<Category> = listOf(
+        Category("maid", "Maid / Cleaning", UNSKILLED),
+        Category("cook", "Cook", SKILLED),
+        Category("cook_catering", "Catering Cook", SKILLED),
+        Category("babysitter", "Babysitter", UNSKILLED),
+        Category("elderly_care", "Elderly Care", SKILLED),
+        Category("electrician", "Electrician", SKILLED),
+        Category("plumber", "Plumber", SKILLED),
+        Category("carpenter", "Carpenter", SKILLED),
+        Category("painter", "Painter", SKILLED),
+        Category("mason", "Mason", SKILLED),
+        Category("construction_worker", "Construction Worker", UNSKILLED),
+        Category("farm_labour", "Farm Labour", UNSKILLED),
+        Category("welder", "Welder", SKILLED),
+        Category("fabricator", "Fabricator", SKILLED),
+        Category("tile_marble", "Tile / Marble", SKILLED),
+        Category("pop_ceiling", "POP / Ceiling", SKILLED),
+        Category("ac_technician", "AC Technician", SKILLED),
+        Category("appliance_repair", "Appliance Repair", SKILLED),
+        Category("ro_technician", "RO Technician", SKILLED),
+        Category("water_tanker", "Water Tanker", UNSKILLED),
+        Category("borewell", "Borewell", SKILLED),
+        Category("solar_technician", "Solar Technician", SKILLED),
+        Category("mobile_repair", "Mobile Repair", SKILLED),
+        Category("cctv", "CCTV Install", SKILLED),
+        Category("mechanic", "Mechanic", SKILLED),
+        Category("driver", "Driver", SKILLED),
+        Category("delivery", "Delivery", UNSKILLED),
+        Category("packers_movers", "Packers & Movers", UNSKILLED),
+        Category("gardener", "Gardener", UNSKILLED),
+        Category("pest_control", "Pest Control", SKILLED),
+        Category("security_guard", "Security Guard", UNSKILLED),
+        Category("barber", "Barber", SKILLED),
+        Category("beautician", "Beautician", SKILLED),
+        Category("tailor", "Tailor", SKILLED),
+        Category("laundry", "Laundry", UNSKILLED),
+        Category("cleaner_commercial", "Office Cleaner", UNSKILLED),
+        Category("photographer", "Photographer", SKILLED),
+        Category("event_helper", "Event Helper", UNSKILLED),
+        Category("tutor", "Tutor", SKILLED),
+        Category("priest", "Priest / Pandit", SKILLED),
+        Category("other", "Other", UNSKILLED)
     )
+
+    private val labels = all.associate { it.value to it.label }
 
     fun label(value: String?): String = labels[value] ?: (value ?: "Service")
 }

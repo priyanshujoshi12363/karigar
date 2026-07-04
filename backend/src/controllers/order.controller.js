@@ -5,7 +5,7 @@ import User from "../models/user.model.js"
 import Worker from "../models/worker.model.js"
 import { CATEGORY_VALUES } from "../constants/categories.js"
 import { computeBill } from "../utils/pricing.js"
-import { buildCandidates, startDispatch, advance, ensureProgress } from "../services/orderDispatch.js"
+import { buildCandidates, startDispatch, advance, ensureProgress, OPEN_POOL_RADIUS_KM } from "../services/orderDispatch.js"
 import { sendPush } from "../utils/sendPush.js"
 
 const notifyCurrentCandidate = async (order) => {
@@ -17,7 +17,7 @@ const notifyCurrentCandidate = async (order) => {
             await sendPush(
                 worker.fcmToken,
                 "New job request",
-                `${order.category} · ₹${order.bill?.workAmount || 0} · tap to accept`,
+                `${order.category} · ₹${order.bill?.total || 0} · tap to accept`,
                 { orderId: String(order._id), type: "new_offer" }
             )
         }
@@ -129,7 +129,7 @@ const formatOfferForWorker = (order, workerId) => {
         category: order.category,
         durationMinutes: order.durationMinutes,
         notes: order.notes,
-        earning: order.bill?.workAmount,
+        earning: order.bill?.total,
         location: order.location,
         distanceKm: candidate ? candidate.distanceKm : undefined,
         offerExpiresAt: order.offerExpiresAt,
@@ -143,7 +143,7 @@ const formatAssignedForWorker = (order) => {
         category: order.category,
         durationMinutes: order.durationMinutes,
         notes: order.notes,
-        earning: order.bill?.workAmount,
+        earning: order.bill?.total,
         status: order.status,
         customer: {
             phone: order.userPhone,
@@ -264,8 +264,17 @@ export const getUserOrder = async (req, res) => {
             return res.status(404).json({ success: false, message: "Order not found" })
         }
 
-        if (order.status === "searching") {
+        if (order.status === "searching" || order.status === "open") {
             ensureProgress(order)
+            if (order.status === "expired" && !order.noWorkersNotified) {
+                order.noWorkersNotified = true
+                notifyUser(
+                    order,
+                    "No worker available",
+                    "No one accepted your request. Increase the price to try again.",
+                    "expired"
+                )
+            }
             await order.save()
         }
 
@@ -296,6 +305,56 @@ export const cancelOrder = async (req, res) => {
         await order.save()
 
         return res.status(200).json({ success: true, message: "Order cancelled" })
+    } catch (err) {
+        return serverError(res, err)
+    }
+}
+
+export const boostOrder = async (req, res) => {
+    try {
+        const { id } = req.params
+        const addAmount = Number(req.body.addAmount)
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({ success: false, message: "invalid order id" })
+        }
+        if (!addAmount || addAmount <= 0) {
+            return res.status(400).json({ success: false, message: "addAmount must be a positive number" })
+        }
+
+        const order = await Order.findOne({ _id: id, user: req.userId })
+        if (!order) {
+            return res.status(404).json({ success: false, message: "Order not found" })
+        }
+        if (!["open", "expired", "searching"].includes(order.status)) {
+            return res.status(409).json({ success: false, message: `cannot boost an order that is ${order.status}` })
+        }
+
+        const bonus = Math.round(addAmount)
+        order.bill.workAmount = (order.bill.workAmount || 0) + bonus
+        order.bill.bonus = (order.bill.bonus || 0) + bonus
+        order.bill.total = (order.bill.total || 0) + bonus
+        order.markModified("bill")
+
+        const coords = order.location.coordinates
+        order.candidates = await buildCandidates(order.category, coords[0], coords[1])
+        order.currentIndex = -1
+        order.offerExpiresAt = null
+        order.openExpiresAt = null
+        order.noWorkersNotified = false
+        order.boostCount = (order.boostCount || 0) + 1
+
+        startDispatch(order)
+        await order.save()
+
+        if (order.candidates.length) notifyCurrentCandidate(order)
+
+        return res.status(200).json({
+            success: true,
+            message: order.candidates.length
+                ? "Request re-sent to nearby workers with higher pay"
+                : "No workers nearby right now, job listed in the open pool",
+            order: formatUserOrder(order),
+        })
     } catch (err) {
         return serverError(res, err)
     }
@@ -504,6 +563,10 @@ export const getOpenJobs = async (req, res) => {
             return res.status(404).json({ success: false, message: "Worker not found" })
         }
 
+        if (!worker.isOnline) {
+            return res.status(200).json({ success: true, count: 0, jobs: [] })
+        }
+
         const hasLocation =
             worker.location &&
             Array.isArray(worker.location.coordinates) &&
@@ -516,6 +579,7 @@ export const getOpenJobs = async (req, res) => {
                     $geoNear: {
                         near: { type: "Point", coordinates: worker.location.coordinates },
                         distanceField: "distance",
+                        maxDistance: OPEN_POOL_RADIUS_KM * 1000,
                         spherical: true,
                         query: { status: "open", category: { $in: worker.categories } },
                     },
@@ -527,7 +591,7 @@ export const getOpenJobs = async (req, res) => {
                 category: o.category,
                 durationMinutes: o.durationMinutes,
                 notes: o.notes,
-                earning: o.bill?.workAmount,
+                earning: o.bill?.total,
                 location: o.location,
                 distanceKm: Math.round((o.distance / 1000) * 100) / 100,
                 createdAt: o.createdAt,
@@ -539,7 +603,7 @@ export const getOpenJobs = async (req, res) => {
                 category: o.category,
                 durationMinutes: o.durationMinutes,
                 notes: o.notes,
-                earning: o.bill?.workAmount,
+                earning: o.bill?.total,
                 location: o.location,
                 createdAt: o.createdAt,
             }))

@@ -7,6 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import com.karigar.worker.notifications.NotificationChannels
 import com.karigar.worker.notifications.registerFcmToken
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,8 +22,9 @@ import androidx.navigation.compose.rememberNavController
 import com.karigar.worker.data.TokenStore
 import com.karigar.worker.navigation.Routes
 import com.karigar.worker.ui.screens.LoginScreen
+import com.karigar.worker.ui.screens.RegisterScreen
 import com.karigar.worker.ui.screens.SplashScreen
-import com.karigar.worker.ui.screens.WorkerHomeScreen
+import com.karigar.worker.ui.screens.WorkerMainScreen
 import com.karigar.worker.ui.theme.KarigarTheme
 
 class MainActivity : ComponentActivity() {
@@ -33,6 +35,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        NotificationChannels.ensure(this)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestNotifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -68,15 +71,29 @@ fun WorkerApp() {
             })
         }
         composable(Routes.LOGIN) {
-            LoginScreen(onLoggedIn = {
-                registerFcmToken(context)
-                nav.navigate(Routes.HOME) {
-                    popUpTo(Routes.LOGIN) { inclusive = true }
-                }
-            })
+            LoginScreen(
+                onLoggedIn = {
+                    registerFcmToken(context)
+                    nav.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+                onRegister = { nav.navigate(Routes.REGISTER) }
+            )
+        }
+        composable(Routes.REGISTER) {
+            RegisterScreen(
+                onRegistered = {
+                    registerFcmToken(context)
+                    nav.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                },
+                onBack = { nav.popBackStack() }
+            )
         }
         composable(Routes.HOME) {
-            WorkerHomeScreen(onLogout = {
+            WorkerMainScreen(onLogout = {
                 store.clear()
                 nav.navigate(Routes.LOGIN) {
                     popUpTo(Routes.HOME) { inclusive = true }

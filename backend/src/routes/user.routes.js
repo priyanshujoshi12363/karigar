@@ -13,6 +13,7 @@ import {
     getUserOrder,
     cancelOrder,
     payOrder,
+    boostOrder,
 } from "../controllers/order.controller.js"
 import { protect } from "../middlewares/auth.middleware.js"
 
@@ -28,6 +29,7 @@ router.post("/orders", protect, createOrder)
 router.get("/orders", protect, getUserOrders)
 router.get("/orders/:id", protect, getUserOrder)
 router.post("/orders/:id/cancel", protect, cancelOrder)
+router.post("/orders/:id/boost", protect, boostOrder)
 router.post("/orders/:id/pay", protect, payOrder)
 
 router.get("/workers/:id", protect, getWorkerById)

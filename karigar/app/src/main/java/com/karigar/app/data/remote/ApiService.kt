@@ -5,6 +5,7 @@ import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface ApiService {
@@ -32,6 +33,12 @@ interface ApiService {
         @Query("search") search: String? = null
     ): CategoriesResponse
 
+    @GET("geo/reverse")
+    suspend fun reverseGeocode(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double
+    ): GeoResponse
+
     @POST("user/orders")
     suspend fun createOrder(
         @Header("Authorization") bearer: String,
@@ -40,4 +47,11 @@ interface ApiService {
 
     @GET("user/orders")
     suspend fun getOrders(@Header("Authorization") bearer: String): OrdersResponse
+
+    @POST("user/orders/{id}/boost")
+    suspend fun boostOrder(
+        @Header("Authorization") bearer: String,
+        @Path("id") id: String,
+        @Body body: BoostRequest
+    ): CreateOrderResponse
 }

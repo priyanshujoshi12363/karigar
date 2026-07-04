@@ -60,6 +60,9 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.auth)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.play.services.location)
+    implementation(libs.osmdroid.android)
     debugImplementation(libs.androidx.ui.tooling)
 }

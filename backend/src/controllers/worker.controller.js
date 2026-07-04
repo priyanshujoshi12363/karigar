@@ -1,8 +1,18 @@
 import { serverError } from "../utils/handleError.js"
 import Worker from "../models/worker.model.js"
+import Order from "../models/order.model.js"
 import { generateToken } from "../utils/generateToken.js"
 import { uploadToCloudinary } from "../utils/uploadToCloudinary.js"
 import { WORKER_CATEGORIES, CATEGORY_VALUES, SKILL_TYPES } from "../constants/categories.js"
+import { getAuth } from "../config/firebase.js"
+
+const resolveVerifiedPhone = async (body) => {
+    if (body.idToken) {
+        const decoded = await getAuth().verifyIdToken(body.idToken)
+        if (decoded.phone_number) return decoded.phone_number
+    }
+    return typeof body.phone === "string" ? body.phone : ""
+}
 
 const formatWorker = (worker) => ({
     id: worker._id,
@@ -20,6 +30,7 @@ const formatWorker = (worker) => ({
         photo: worker.aadhar?.photo,
     },
     isVerified: worker.isVerified,
+    isOnline: worker.isOnline,
     expoToken: worker.expoToken,
     createdAt: worker.createdAt,
 })
@@ -70,7 +81,14 @@ export const getCategories = (req, res) => {
 
 export const registerWorker = async (req, res) => {
     try {
-        const { phone, name, address, aadharNumber, companyName, bio, expoToken } = req.body
+        const { name, address, aadharNumber, companyName, bio, expoToken } = req.body
+
+        let phone
+        try {
+            phone = await resolveVerifiedPhone(req.body)
+        } catch (e) {
+            return res.status(401).json({ success: false, message: "Invalid or expired OTP verification" })
+        }
 
         let coordinates = req.body.coordinates
         if (typeof coordinates === "string") {
@@ -153,7 +171,14 @@ export const registerWorker = async (req, res) => {
 
 export const loginWorker = async (req, res) => {
     try {
-        const { phone, expoToken } = req.body
+        const { expoToken } = req.body
+
+        let phone
+        try {
+            phone = await resolveVerifiedPhone(req.body)
+        } catch (e) {
+            return res.status(401).json({ success: false, message: "Invalid or expired OTP verification" })
+        }
 
         if (!phone || typeof phone !== "string") {
             return res.status(400).json({ success: false, message: "phone is required" })
@@ -212,6 +237,74 @@ export const getWorkerProfile = async (req, res) => {
     }
 }
 
+export const getWorkerStats = async (req, res) => {
+    try {
+        const now = new Date()
+        const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+        const startWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+        const orders = await Order.find({ assignedWorker: req.workerId })
+
+        let completedJobs = 0
+        let activeJobs = 0
+        let cancelledJobs = 0
+        let totalEarnings = 0
+        let todayEarnings = 0
+        let weekEarnings = 0
+
+        for (const o of orders) {
+            if (o.status === "completed") {
+                completedJobs++
+                const amt = o.bill?.total || 0
+                totalEarnings += amt
+                const when = o.completedAt || o.updatedAt
+                if (when && when >= startToday) todayEarnings += amt
+                if (when && when >= startWeek) weekEarnings += amt
+            } else if (o.status === "cancelled") {
+                cancelledJobs++
+            } else if (["assigned", "in_progress", "awaiting_payment"].includes(o.status)) {
+                activeJobs++
+            }
+        }
+
+        return res.status(200).json({
+            success: true,
+            stats: {
+                totalJobs: orders.length,
+                completedJobs,
+                activeJobs,
+                cancelledJobs,
+                totalEarnings,
+                todayEarnings,
+                weekEarnings,
+            },
+        })
+    } catch (err) {
+        return serverError(res, err)
+    }
+}
+
+export const setWorkerAvailability = async (req, res) => {
+    try {
+        const isOnline = req.body.isOnline === true || req.body.isOnline === "true"
+        const worker = await Worker.findByIdAndUpdate(
+            req.workerId,
+            { isOnline },
+            { new: true }
+        )
+        if (!worker) {
+            return res.status(404).json({ success: false, message: "Worker not found" })
+        }
+        return res.status(200).json({
+            success: true,
+            message: isOnline ? "You are online" : "You are offline",
+            isOnline: worker.isOnline,
+        })
+    } catch (err) {
+        return serverError(res, err)
+    }
+}
+
 export const updateWorkerLocation = async (req, res) => {
     try {
         let coordinates = req.body.coordinates
@@ -227,15 +320,16 @@ export const updateWorkerLocation = async (req, res) => {
             return res.status(400).json({ success: false, message: "coordinates [lng, lat] are required" })
         }
 
-        const worker = await Worker.findByIdAndUpdate(
-            req.workerId,
-            { location: { type: "Point", coordinates } },
-            { new: true }
-        )
-
+        const worker = await Worker.findById(req.workerId)
         if (!worker) {
             return res.status(404).json({ success: false, message: "Worker not found" })
         }
+
+        worker.location = { type: "Point", coordinates }
+        if (typeof req.body.address === "string" && req.body.address.trim()) {
+            worker.address = req.body.address.trim()
+        }
+        await worker.save()
 
         return res.status(200).json({
             success: true,

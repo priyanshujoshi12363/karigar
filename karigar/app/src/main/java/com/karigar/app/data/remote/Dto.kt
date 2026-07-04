@@ -39,6 +39,19 @@ data class PushTokenRequest(val token: String)
 
 data class SimpleResponse(val success: Boolean, val message: String?)
 
+data class AddressDto(
+    val formatted: String?,
+    val city: String?,
+    val state: String?,
+    val postcode: String?
+)
+
+data class GeoResponse(
+    val success: Boolean,
+    val message: String?,
+    val address: AddressDto?
+)
+
 data class CategoryDto(
     val value: String,
     val label: String,
@@ -58,6 +71,8 @@ data class CreateOrderRequest(
     val address: String? = null,
     val notes: String? = null
 )
+
+data class BoostRequest(val addAmount: Int)
 
 data class BillDto(
     val total: Double?,

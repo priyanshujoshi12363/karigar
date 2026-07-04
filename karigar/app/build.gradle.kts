@@ -64,5 +64,6 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.firebase.auth)
     implementation(libs.androidx.security.crypto)
+    implementation(libs.play.services.location)
     debugImplementation(libs.androidx.ui.tooling)
 }

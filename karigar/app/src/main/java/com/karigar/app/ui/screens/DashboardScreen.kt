@@ -1,6 +1,10 @@
 package com.karigar.app.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.draw.scale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,6 +43,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import com.karigar.app.data.TokenStore
 import com.karigar.app.data.remote.ApiClient
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,6 +66,8 @@ fun DashboardScreen(onSelectCategory: (String) -> Unit) {
     var query by remember { mutableStateOf("") }
     var skillFilter by remember { mutableStateOf("all") }
     var cats by remember { mutableStateOf(Categories.all) }
+    val context = LocalContext.current
+    var userAddress by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) {
         try {
@@ -67,6 +75,11 @@ fun DashboardScreen(onSelectCategory: (String) -> Unit) {
             if (resp.success && resp.categories.isNotEmpty()) {
                 cats = resp.categories.map { Category(it.value, it.label, it.skill, "") }
             }
+        } catch (_: Exception) {
+        }
+        try {
+            val token = TokenStore(context).getToken()
+            userAddress = ApiClient.api.getMe("Bearer $token").user?.address
         } catch (_: Exception) {
         }
     }
@@ -99,7 +112,14 @@ fun DashboardScreen(onSelectCategory: (String) -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Filled.LocationOn, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(6.dp))
-                Text("Nagpur, Maharashtra", color = MaterialTheme.colorScheme.onPrimary, fontSize = 13.sp)
+                Text(
+                    userAddress?.split(",")?.take(2)?.joinToString(",")?.trim()?.ifBlank { null }
+                        ?: "Set your location",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontSize = 13.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
             Spacer(Modifier.height(10.dp))
             Text(greeting, color = MaterialTheme.colorScheme.onPrimary, fontSize = 14.sp)
@@ -219,12 +239,16 @@ private fun SkillChip(label: String, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 private fun CategoryCard(category: Category, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val cardScale by animateFloatAsState(if (pressed) 0.93f else 1f, label = "catScale")
     Card(
         onClick = onClick,
+        interactionSource = interaction,
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        modifier = Modifier.fillMaxWidth().aspectRatio(0.85f)
+        modifier = Modifier.fillMaxWidth().aspectRatio(0.85f).scale(cardScale)
     ) {
         Column(
             modifier = Modifier.fillMaxSize().padding(8.dp),

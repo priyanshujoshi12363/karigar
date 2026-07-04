@@ -70,6 +70,11 @@ const workerSchema = new mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        isOnline: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
         expoToken: {
             type: String,
             default: null,

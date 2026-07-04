@@ -14,7 +14,13 @@ export const sendPush = async (token, title, body, data = {}) => {
             data: stringData,
             android: {
                 priority: "high",
-                notification: { channelId: "orders" },
+                notification: {
+                    channelId: "karigar_jobs",
+                    sound: "default",
+                    notificationPriority: "PRIORITY_MAX",
+                    defaultVibrateTimings: false,
+                    vibrateTimings: ["0s", "0.4s", "0.2s", "0.4s"],
+                },
             },
         })
     } catch (err) {
