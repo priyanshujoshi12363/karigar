@@ -13,35 +13,35 @@ import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 
 private val LightColors = lightColorScheme(
-    primary = BluePrimary,
+    primary = GreenPrimary,
     onPrimary = White,
-    primaryContainer = SkyBlue,
-    onPrimaryContainer = BluePrimaryDark,
-    secondary = BlueAccent,
+    primaryContainer = PaleGreen,
+    onPrimaryContainer = GreenPrimaryDark,
+    secondary = GreenAccent,
     onSecondary = White,
-    secondaryContainer = SkyBlue,
-    onSecondaryContainer = BluePrimaryDark,
-    tertiary = LightBlue,
+    secondaryContainer = PaleGreen,
+    onSecondaryContainer = GreenPrimaryDark,
+    tertiary = LightGreen,
     onTertiary = White,
     background = OffWhite,
     onBackground = SlateText,
     surface = White,
     onSurface = SlateText,
-    surfaceVariant = SkyBlue,
+    surfaceVariant = PaleGreen,
     onSurfaceVariant = MutedText,
     outline = BorderGrey
 )
 
 private val DarkColors = darkColorScheme(
-    primary = DarkBlueAccent,
-    onPrimary = White,
-    primaryContainer = DarkBlueContainer,
-    onPrimaryContainer = DarkBlueLight,
-    secondary = DarkBlueLight,
+    primary = DarkGreenAccent,
+    onPrimary = DarkBackground,
+    primaryContainer = DarkGreenContainer,
+    onPrimaryContainer = DarkGreenLight,
+    secondary = DarkGreenLight,
     onSecondary = DarkBackground,
-    secondaryContainer = DarkBlueContainer,
-    onSecondaryContainer = DarkBlueLight,
-    tertiary = LightBlue,
+    secondaryContainer = DarkGreenContainer,
+    onSecondaryContainer = DarkGreenLight,
+    tertiary = LightGreen,
     onTertiary = DarkBackground,
     background = DarkBackground,
     onBackground = DarkOnSurface,
@@ -77,6 +77,6 @@ fun brandHeaderBrush(): Brush {
     return if (isSystemInDarkTheme()) {
         Brush.verticalGradient(listOf(DarkHeader, DarkSurface))
     } else {
-        Brush.verticalGradient(listOf(BluePrimary, BlueAccent))
+        Brush.verticalGradient(listOf(GreenPrimary, GreenAccent))
     }
 }

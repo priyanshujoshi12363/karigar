@@ -17,6 +17,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+const val OFFER_NOTIFICATION_ID = 1001
+
 class WorkerMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
@@ -32,10 +34,12 @@ class WorkerMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         val title = message.notification?.title ?: message.data["title"] ?: "Karigar"
         val body = message.notification?.body ?: message.data["body"] ?: ""
-        showNotification(title, body)
+        val type = message.data["type"]
+        val ttlSeconds = message.data["ttl"]?.toLongOrNull()
+        showNotification(title, body, type, ttlSeconds)
     }
 
-    private fun showNotification(title: String, body: String) {
+    private fun showNotification(title: String, body: String, type: String? = null, ttlSeconds: Long? = null) {
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         NotificationChannels.ensure(this)
 
@@ -49,7 +53,7 @@ class WorkerMessagingService : FirebaseMessagingService() {
 
         val sound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-        val notification = NotificationCompat.Builder(this, JOBS_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, JOBS_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(body)
@@ -59,8 +63,13 @@ class WorkerMessagingService : FirebaseMessagingService() {
             .setVibrate(JOBS_VIBRATION_PATTERN)
             .setSound(sound)
             .setContentIntent(pending)
-            .build()
 
-        manager.notify(System.currentTimeMillis().toInt(), notification)
+        if (type == "new_offer") {
+            val ttlMs = (ttlSeconds ?: 30L) * 1000L
+            builder.setTimeoutAfter(ttlMs)
+        }
+
+        val notificationId = if (type == "new_offer") OFFER_NOTIFICATION_ID else System.currentTimeMillis().toInt()
+        manager.notify(notificationId, builder.build())
     }
 }

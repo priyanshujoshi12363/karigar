@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocationOn
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -49,10 +51,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import com.karigar.app.R
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import com.karigar.app.data.Legal
+import com.karigar.app.data.LegalDoc
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.firebase.FirebaseException
@@ -100,6 +108,8 @@ fun AuthScreen(onAuthed: () -> Unit) {
     var showPicker by remember { mutableStateOf(false) }
     var regLat by remember { mutableStateOf<Double?>(null) }
     var regLng by remember { mutableStateOf<Double?>(null) }
+    var agreed by remember { mutableStateOf(false) }
+    var legalDoc by remember { mutableStateOf<LegalDoc?>(null) }
 
     fun callBackend(idToken: String?) {
         scope.launch {
@@ -280,10 +290,16 @@ fun AuthScreen(onAuthed: () -> Unit) {
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
-                        Spacer(Modifier.height(28.dp))
+                        Spacer(Modifier.height(18.dp))
+                        ConsentRow(
+                            agreed = agreed,
+                            onCheckedChange = { agreed = it },
+                            onOpenDoc = { legalDoc = it }
+                        )
+                        Spacer(Modifier.height(18.dp))
                         PrimaryButton(
                             text = "Send OTP",
-                            enabled = phone.length == 10 && (!isRegister || name.isNotBlank()),
+                            enabled = phone.length == 10 && (!isRegister || name.isNotBlank()) && agreed,
                             loading = loading
                         ) {
                             error = null
@@ -382,6 +398,51 @@ fun AuthScreen(onAuthed: () -> Unit) {
             onDismiss = { showPicker = false }
         )
     }
+
+    legalDoc?.let { doc ->
+        LegalScreen(doc = doc, onBack = { legalDoc = null })
+    }
+    }
+}
+
+@Composable
+private fun ConsentRow(
+    agreed: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onOpenDoc: (LegalDoc) -> Unit
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    val annotated = buildAnnotatedString {
+        append("I have read and agree to the ")
+        pushStringAnnotation("doc", "terms")
+        withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold)) { append("Terms & Conditions") }
+        pop()
+        append(", ")
+        pushStringAnnotation("doc", "privacy")
+        withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold)) { append("Privacy Policy") }
+        pop()
+        append(", ")
+        pushStringAnnotation("doc", "refund")
+        withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold)) { append("Refund Policy") }
+        pop()
+        append(" and ")
+        pushStringAnnotation("doc", "community")
+        withStyle(SpanStyle(color = primary, fontWeight = FontWeight.Bold)) { append("Community Guidelines") }
+        pop()
+        append(".")
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(checked = agreed, onCheckedChange = onCheckedChange)
+        Spacer(Modifier.size(2.dp))
+        ClickableText(
+            text = annotated,
+            style = TextStyle(fontSize = 13.sp, color = muted, lineHeight = 18.sp)
+        ) { offset ->
+            annotated.getStringAnnotations("doc", offset, offset).firstOrNull()?.let { ann ->
+                Legal.byKey(ann.item)?.let(onOpenDoc)
+            }
+        }
     }
 }
 

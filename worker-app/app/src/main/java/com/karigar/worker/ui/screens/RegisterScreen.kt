@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import com.karigar.worker.auth.PhoneAuthenticator
 import com.karigar.worker.auth.findActivity
 import com.karigar.worker.data.Categories
+import com.karigar.worker.data.LegalDoc
+import com.karigar.worker.ui.components.ConsentRow
 import com.karigar.worker.data.TokenStore
 import com.karigar.worker.data.remote.ApiClient
 import com.karigar.worker.ui.components.PrimaryButton
@@ -88,13 +90,15 @@ fun RegisterScreen(onRegistered: () -> Unit, onBack: () -> Unit) {
     var showPicker by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var agreed by remember { mutableStateOf(false) }
+    var legalDoc by remember { mutableStateOf<LegalDoc?>(null) }
 
     val pickImage = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         photoUri = uri
     }
 
     val canSubmit = name.isNotBlank() && phone.length == 10 && aadharNumber.isNotBlank() &&
-        selected.isNotEmpty() && photoUri != null && (!worked || companyName.isNotBlank())
+        selected.isNotEmpty() && photoUri != null && (!worked || companyName.isNotBlank()) && agreed
 
     fun submit(idToken: String) {
         val uri = photoUri ?: return
@@ -269,6 +273,8 @@ fun RegisterScreen(onRegistered: () -> Unit, onBack: () -> Unit) {
                 }
 
                 Spacer(Modifier.height(28.dp))
+                ConsentRow(agreed = agreed, onCheckedChange = { agreed = it }, onOpenDoc = { legalDoc = it })
+                Spacer(Modifier.height(16.dp))
                 PrimaryButton(text = "Create Partner Account", enabled = canSubmit, loading = loading) { startOtp() }
                 if (error != null) {
                     Spacer(Modifier.height(12.dp))
@@ -319,6 +325,10 @@ fun RegisterScreen(onRegistered: () -> Unit, onBack: () -> Unit) {
                 },
                 dismissButton = { TextButton(onClick = { showOtpDialog = false; loading = false }) { Text("Cancel") } }
             )
+        }
+
+        legalDoc?.let { doc ->
+            LegalScreen(doc = doc, onBack = { legalDoc = null })
         }
     }
 }

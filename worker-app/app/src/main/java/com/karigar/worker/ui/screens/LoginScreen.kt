@@ -50,9 +50,11 @@ import androidx.compose.ui.unit.sp
 import com.karigar.worker.R
 import com.karigar.worker.auth.PhoneAuthenticator
 import com.karigar.worker.auth.findActivity
+import com.karigar.worker.data.LegalDoc
 import com.karigar.worker.data.TokenStore
 import com.karigar.worker.data.remote.ApiClient
 import com.karigar.worker.data.remote.LoginRequest
+import com.karigar.worker.ui.components.ConsentRow
 import com.karigar.worker.ui.components.PrimaryButton
 import com.karigar.worker.ui.theme.brandHeaderBrush
 import kotlinx.coroutines.launch
@@ -71,6 +73,8 @@ fun LoginScreen(onLoggedIn: () -> Unit, onRegister: () -> Unit) {
     var otp by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var agreed by remember { mutableStateOf(false) }
+    var legalDoc by remember { mutableStateOf<LegalDoc?>(null) }
 
     fun doLogin(idToken: String) {
         scope.launch {
@@ -114,6 +118,7 @@ fun LoginScreen(onLoggedIn: () -> Unit, onRegister: () -> Unit) {
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Box(
             modifier = Modifier
@@ -157,8 +162,10 @@ fun LoginScreen(onLoggedIn: () -> Unit, onRegister: () -> Unit) {
                             shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(Modifier.height(28.dp))
-                        PrimaryButton(text = "Send OTP", enabled = phone.length == 10, loading = loading) { sendOtp() }
+                        Spacer(Modifier.height(18.dp))
+                        ConsentRow(agreed = agreed, onCheckedChange = { agreed = it }, onOpenDoc = { legalDoc = it })
+                        Spacer(Modifier.height(18.dp))
+                        PrimaryButton(text = "Send OTP", enabled = phone.length == 10 && agreed, loading = loading) { sendOtp() }
                         if (error != null) {
                             Spacer(Modifier.height(12.dp))
                             Text(error!!, color = Color(0xFFD32F2F), fontSize = 13.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -209,5 +216,10 @@ fun LoginScreen(onLoggedIn: () -> Unit, onRegister: () -> Unit) {
                 }
             }
         }
+    }
+
+    legalDoc?.let { doc ->
+        LegalScreen(doc = doc, onBack = { legalDoc = null })
+    }
     }
 }

@@ -5,7 +5,7 @@ import User from "../models/user.model.js"
 import Worker from "../models/worker.model.js"
 import { CATEGORY_VALUES } from "../constants/categories.js"
 import { computeBill } from "../utils/pricing.js"
-import { buildCandidates, startDispatch, advance, ensureProgress, OPEN_POOL_RADIUS_KM } from "../services/orderDispatch.js"
+import { buildCandidates, startDispatch, advance, ensureProgress, OPEN_POOL_RADIUS_KM, OFFER_TTL_SECONDS } from "../services/orderDispatch.js"
 import { sendPush } from "../utils/sendPush.js"
 
 const notifyCurrentCandidate = async (order) => {
@@ -18,7 +18,8 @@ const notifyCurrentCandidate = async (order) => {
                 worker.fcmToken,
                 "New job request",
                 `${order.category} · ₹${order.bill?.total || 0} · tap to accept`,
-                { orderId: String(order._id), type: "new_offer" }
+                { orderId: String(order._id), type: "new_offer", ttl: OFFER_TTL_SECONDS },
+                { dataOnly: true, ttlSeconds: OFFER_TTL_SECONDS }
             )
         }
     } catch (e) {

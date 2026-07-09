@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.sp
 import com.karigar.worker.data.TokenStore
 import com.karigar.worker.data.remote.ApiClient
 import com.karigar.worker.navigation.Routes
-import com.karigar.worker.ui.theme.BluePrimary
 import com.karigar.worker.ui.theme.brandHeaderBrush
 import kotlinx.coroutines.delay
 import retrofit2.HttpException
