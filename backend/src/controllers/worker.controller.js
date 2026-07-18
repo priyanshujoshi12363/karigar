@@ -284,27 +284,6 @@ export const getWorkerStats = async (req, res) => {
     }
 }
 
-export const setWorkerAvailability = async (req, res) => {
-    try {
-        const isOnline = req.body.isOnline === true || req.body.isOnline === "true"
-        const worker = await Worker.findByIdAndUpdate(
-            req.workerId,
-            { isOnline },
-            { new: true }
-        )
-        if (!worker) {
-            return res.status(404).json({ success: false, message: "Worker not found" })
-        }
-        return res.status(200).json({
-            success: true,
-            message: isOnline ? "You are online" : "You are offline",
-            isOnline: worker.isOnline,
-        })
-    } catch (err) {
-        return serverError(res, err)
-    }
-}
-
 export const updateWorkerLocation = async (req, res) => {
     try {
         let coordinates = req.body.coordinates

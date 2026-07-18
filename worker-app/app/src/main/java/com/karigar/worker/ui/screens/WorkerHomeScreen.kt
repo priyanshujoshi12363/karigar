@@ -1,7 +1,11 @@
 package com.karigar.worker.ui.screens
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,8 +41,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,10 +61,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.karigar.worker.data.Categories
 import com.karigar.worker.data.TokenStore
 import com.karigar.worker.data.remote.ApiClient
-import com.karigar.worker.data.remote.AvailabilityRequest
 import com.karigar.worker.data.remote.JobDto
 import com.karigar.worker.data.remote.OfferDto
 import com.karigar.worker.data.remote.OtpRequest
@@ -84,7 +89,6 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
     val bearer = remember { "Bearer " + (TokenStore(context).getToken() ?: "") }
 
     var loading by remember { mutableStateOf(true) }
-    var online by remember { mutableStateOf(false) }
     var offers by remember { mutableStateOf<List<OfferDto>>(emptyList()) }
     var jobs by remember { mutableStateOf<List<JobDto>>(emptyList()) }
     var myOrders by remember { mutableStateOf<List<WorkerOrderDto>>(emptyList()) }
@@ -96,10 +100,40 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
     var payFor by remember { mutableStateOf<WorkerOrderDto?>(null) }
     var showLocationPicker by remember { mutableStateOf(false) }
 
+    fun refreshLocation() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!granted) return
+        try {
+            val fused = LocationServices.getFusedLocationProviderClient(context)
+            fused.getCurrentLocation(Priority.PRIORITY_BALANCED_POWER_ACCURACY, CancellationTokenSource().token)
+                .addOnSuccessListener { loc ->
+                    if (loc != null) {
+                        scope.launch {
+                            try {
+                                ApiClient.api.updateLocation(bearer, UpdateLocationRequest(listOf(loc.longitude, loc.latitude), null))
+                            } catch (_: Exception) {
+                            }
+                        }
+                    }
+                }
+        } catch (_: Exception) {
+        }
+    }
+
+    val locationPermLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) refreshLocation()
+    }
+
+    LaunchedEffect(Unit) {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (granted) refreshLocation() else locationPermLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
+
     LaunchedEffect(reload) {
         loading = true
         try {
-            online = ApiClient.api.workerMe(bearer).worker?.isOnline ?: online
             offers = ApiClient.api.getOffers(bearer).offers
             jobs = ApiClient.api.getJobs(bearer).jobs
             myOrders = ApiClient.api.getWorkerOrders(bearer).orders
@@ -120,19 +154,6 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
         }
     }
 
-    fun toggleOnline(value: Boolean) {
-        online = value
-        scope.launch {
-            try {
-                val r = ApiClient.api.setAvailability(bearer, AvailabilityRequest(value))
-                online = r.isOnline ?: value
-            } catch (_: Exception) {
-                online = !value
-            }
-            reload++
-        }
-    }
-
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Row(
             modifier = Modifier.fillMaxWidth().background(brandHeaderBrush()).padding(start = 20.dp, end = 12.dp, top = 30.dp, bottom = 18.dp),
@@ -144,8 +165,6 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
             }
             IconButton(onClick = onLogout) { Icon(Icons.AutoMirrored.Filled.Logout, "Logout", tint = Color.White) }
         }
-
-        AvailabilityBar(online = online, onToggle = { toggleOnline(it) })
 
         if (loading) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -251,48 +270,6 @@ fun WorkerHomeScreen(onLogout: () -> Unit) {
                 }
             },
             onDismiss = { showLocationPicker = false }
-        )
-    }
-}
-
-@Composable
-private fun AvailabilityBar(online: Boolean, onToggle: (Boolean) -> Unit) {
-    val activeColor = Color(0xFF16A34A)
-    val idleColor = MaterialTheme.colorScheme.onSurfaceVariant
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(if (online) activeColor else idleColor)
-        )
-        Spacer(Modifier.size(10.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                if (online) "You're online" else "You're offline",
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = if (online) activeColor else MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                if (online) "Receiving new job requests" else "Go online to start getting work",
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-        Switch(
-            checked = online,
-            onCheckedChange = onToggle,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = activeColor
-            )
         )
     }
 }

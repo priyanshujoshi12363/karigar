@@ -10,9 +10,6 @@ data class AuthResponse(
 
 data class SimpleResponse(val success: Boolean, val message: String?)
 
-data class AvailabilityRequest(val isOnline: Boolean)
-data class AvailabilityResponse(val success: Boolean, val message: String?, val isOnline: Boolean?)
-
 data class WorkerProfileDto(
     val id: String?,
     val name: String?,

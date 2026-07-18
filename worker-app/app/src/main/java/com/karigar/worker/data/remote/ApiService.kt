@@ -38,12 +38,6 @@ interface ApiService {
     @GET("worker/stats")
     suspend fun getStats(@Header("Authorization") bearer: String): WorkerStatsResponse
 
-    @PATCH("worker/availability")
-    suspend fun setAvailability(
-        @Header("Authorization") bearer: String,
-        @Body body: AvailabilityRequest
-    ): AvailabilityResponse
-
     @GET("geo/reverse")
     suspend fun reverseGeocode(
         @Query("lat") lat: Double,

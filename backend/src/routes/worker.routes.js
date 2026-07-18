@@ -7,7 +7,6 @@ import {
     updateWorkerLocation,
     getNearbyWorkers,
     saveWorkerPushToken,
-    setWorkerAvailability,
     getWorkerStats,
 } from "../controllers/worker.controller.js"
 import {
@@ -32,7 +31,6 @@ router.post("/login", loginWorker)
 router.get("/me", protectWorker, getWorkerProfile)
 router.get("/stats", protectWorker, getWorkerStats)
 router.patch("/location", protectWorker, updateWorkerLocation)
-router.patch("/availability", protectWorker, setWorkerAvailability)
 router.patch("/push-token", protectWorker, saveWorkerPushToken)
 router.get("/nearby", protect, getNearbyWorkers)
 

@@ -18,8 +18,7 @@ const notifyCurrentCandidate = async (order) => {
                 worker.fcmToken,
                 "New job request",
                 `${order.category} · ₹${order.bill?.total || 0} · tap to accept`,
-                { orderId: String(order._id), type: "new_offer", ttl: OFFER_TTL_SECONDS },
-                { dataOnly: true, ttlSeconds: OFFER_TTL_SECONDS }
+                { orderId: String(order._id), type: "new_offer", ttl: OFFER_TTL_SECONDS }
             )
         }
     } catch (e) {
@@ -562,10 +561,6 @@ export const getOpenJobs = async (req, res) => {
         const worker = await Worker.findById(req.workerId)
         if (!worker) {
             return res.status(404).json({ success: false, message: "Worker not found" })
-        }
-
-        if (!worker.isOnline) {
-            return res.status(200).json({ success: true, count: 0, jobs: [] })
         }
 
         const hasLocation =

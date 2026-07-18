@@ -13,7 +13,7 @@ export const buildCandidates = async (category, lng, lat) => {
                 distanceField: "distance",
                 maxDistance: SEARCH_RADIUS_KM * 1000,
                 spherical: true,
-                query: { categories: category, isOnline: true },
+                query: { categories: category },
             },
         },
         { $limit: 50 },
